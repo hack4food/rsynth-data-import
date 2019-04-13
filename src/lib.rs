@@ -1,53 +1,73 @@
-use std::fs::File;
-use std::path::Path;
-use std::io::BufReader;
+use std::io::Error as IOError;
 
-type WaveData = Vec<(u64, f32)>;
+type WaveFrame = (u64, f32);
+type WaveData = Vec<WaveFrame>;
+type WaveDataResult = Result<WaveData, IOError>;
 
-fn open_csv_file(file: &Path) -> Option<File> {
-    match File::open(file) {
-        Ok(f) => Some(f),
-        Err(e) => {
-            println!("Error: {:?}", e);
-            None
-        }
+pub fn open_and_parse_csv(csv_path: &str) -> WaveDataResult {
+    let contents = std::fs::read_to_string(csv_path)?;
+    parse_csv(contents)
+}
+
+fn parse_csv(contents: String) -> Result<WaveData, IOError> {
+    let acc = Ok(vec![]);
+    contents
+        .lines()
+        .filter(is_non_empty)
+        .fold(acc, parse_csv_line)
+}
+
+fn parse_csv_line(res: WaveDataResult, line: &str) -> WaveDataResult {
+    match res {
+        Ok(mut acc) => match tokenise_line(line).map(parse_wave_data) {
+            Ok(line_data) => {
+                acc.push(line_data);
+                Ok(acc)
+            }
+            Err(e) => Err(e),
+        },
+        Err(_) => res,
     }
 }
 
-pub fn open_and_parse_csv(file: &Path) -> Option<WaveData> {
-    // TODO: (emilio) PR för:
-    //   open?
-    //   read_content?
-    //   parse_content?
-    match open_csv_file(file) {
-        Some(f) => read_and_parse_file(f),
-        None => None,
-    }
+fn is_non_empty<'r>(line: &'r &str) -> bool {
+    !line.trim().is_empty()
 }
 
-fn read_and_parse_file(file: File) -> Option<WaveData> {
-    let mut buf_reader = BufReader::new(file);
-    let mut contents = String::new();
-    match buf_reader.read_to_string(&mut contents) {
-        Ok(num_bytes) => {
-            println!("Read {} number of bytes", num_bytes);
-            parse_contents(contents)
-        }
-        Err(e) => {
-            println!("Could not read data from file: {:?}", e);
-            None
-        }
-    }
+fn tokenise_line<'a>(line: &'a str) -> Result<(String, String), IOError> {
+    let mut line_parts = line.split(",");
+    let line_ts_raw = line_parts
+        .next()
+        .ok_or_else(|| IOError::from(std::io::ErrorKind::InvalidInput))?;
+    let line_amp_raw = line_parts
+        .next()
+        .ok_or_else(|| IOError::from(std::io::ErrorKind::InvalidInput))?;
+    Ok((line_ts_raw.to_string(), line_amp_raw.to_string()))
 }
 
-fn parse_contents(contents: String) -> Option<WaveData> {
-    // TODO: do the parsing from String -> WaveData
+fn parse_wave_data((a, b): (String, String)) -> WaveFrame {
+    (a.parse().unwrap(), b.parse().unwrap())
 }
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4); 
+    fn test_api() {
+        assert_eq!(
+            open_and_parse_csv("asset/test_data.csv").unwrap(),
+            vec!(
+                (1554451200000, 10.0),
+                (1554454800000, 25.0),
+                (1554458400000, 25.0),
+                (1554462000000, 22.0)
+            )
+        );
+    }
+
+    #[test]
+    fn test_api_errors() {
+        assert!(open_and_parse_csv("asset/test_data_malformed.csv").is_err());
     }
 }
