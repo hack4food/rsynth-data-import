@@ -11,7 +11,7 @@ pub fn open_and_parse_csv(csv_path: &str) -> WaveDataResult {
     std::fs::read_to_string(csv_path)?
         .lines()
         .filter(is_non_empty)
-        .fold(Ok(vec![]), process_line) // TODO: maybe just do a for-loop with `break`?
+        .fold(Ok(vec![]), process_line)
 }
 
 fn is_non_empty<'r>(line: &'r &str) -> bool {
