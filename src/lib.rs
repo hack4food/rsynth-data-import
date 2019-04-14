@@ -33,13 +33,13 @@ fn parse_csv_line(line: &str) -> Result<WaveFrame, IOError> {
 
 fn tokenise_line<'a>(line: &'a str) -> Result<(String, String), IOError> {
     let mut line_parts = line.split(",");
-    let line_ts_raw = line_parts
-        .next()
-        .ok_or_else(|| IOError::from(InvalidInput))?;
-    let line_amp_raw = line_parts
-        .next()
-        .ok_or_else(|| IOError::from(InvalidInput))?;
+    let line_ts_raw = next_line_part(&mut line_parts)?;
+    let line_amp_raw = next_line_part(&mut line_parts)?;
     Ok((line_ts_raw.to_string(), line_amp_raw.to_string()))
+}
+
+fn next_line_part<'a>(line_parts: &mut std::str::Split<'a, &str>) -> Result<&'a str, IOError> {
+    line_parts.next().ok_or_else(|| IOError::from(InvalidInput))
 }
 
 fn parse_wave_data((a, b): (String, String)) -> Result<WaveFrame, IOError> {
