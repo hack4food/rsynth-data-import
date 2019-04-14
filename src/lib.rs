@@ -2,6 +2,7 @@ use std::io::{
     Error as IOError,
     ErrorKind::{InvalidData, InvalidInput},
 };
+use std::str::Split;
 
 type WaveFrame = (u64, f32);
 type WaveData = Vec<WaveFrame>;
@@ -38,7 +39,7 @@ fn tokenise_line<'a>(line: &'a str) -> Result<(String, String), IOError> {
     Ok((line_ts_raw.to_string(), line_amp_raw.to_string()))
 }
 
-fn next_line_part<'a>(line_parts: &mut std::str::Split<'a, &str>) -> Result<&'a str, IOError> {
+fn next_line_part<'a>(line_parts: &mut Split<'a, &str>) -> Result<&'a str, IOError> {
     line_parts.next().ok_or_else(|| IOError::from(InvalidInput))
 }
 
