@@ -45,9 +45,10 @@ fn next_line_part<'a>(line_parts: &mut Split<'a, &str>) -> Result<&'a str, IOErr
 }
 
 fn parse_wave_data((a, b): (String, String)) -> Result<WaveFrame, IOError> {
-    let a_val = a.parse().or_else(|_| Err(IOError::from(InvalidData)))?;
-    let b_val = b.parse().or_else(|_| Err(IOError::from(InvalidData)))?;
-    Ok((a_val, b_val))
+    Ok((
+        a.parse().or_else(|_| Err(IOError::from(InvalidData)))?,
+        b.parse().or_else(|_| Err(IOError::from(InvalidData)))?,
+    ))
 }
 
 #[cfg(test)]
