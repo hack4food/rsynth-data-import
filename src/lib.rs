@@ -29,10 +29,10 @@ fn process_line(res: WaveDataResult, line: &str) -> WaveDataResult {
 }
 
 fn parse_csv_line(line: &str) -> Result<WaveFrame, IOError> {
-    tokenise_line(line).and_then(parse_wave_data)
+    split_line(line).and_then(parse_wave_data)
 }
 
-fn tokenise_line<'a>(line: &'a str) -> Result<(String, String), IOError> {
+fn split_line<'a>(line: &'a str) -> Result<(String, String), IOError> {
     let mut line_parts = line.split(",");
     Ok((
         next_line_part(&mut line_parts)?.to_string(),
@@ -56,9 +56,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_api() {
+    fn verify_successful_csv_reading() {
         assert_eq!(
-            open_and_parse_csv("asset/test_data.csv").unwrap(),
+            open_and_parse_csv("asset/test_data_valid.csv").unwrap(),
             vec!(
                 (1554451200000, 10.0),
                 (1554454800000, 25.0),
