@@ -4,11 +4,11 @@ use std::io::{
 };
 use std::str::Split;
 
-type WaveFrame = (u64, f32);
-type WaveData = Vec<WaveFrame>;
-type WaveDataResult = Result<WaveData, IOError>;
+type RawWaveFrame = (u64, u64);
+type RawWaveData = Vec<RawWaveFrame>;
+type RawWaveDataResult = Result<RawWaveData, IOError>;
 
-pub fn open_and_parse_csv(csv_path: &str) -> WaveDataResult {
+pub fn open_and_parse_csv(csv_path: &str) -> RawWaveDataResult {
     std::fs::read_to_string(csv_path)?
         .lines()
         .filter(is_non_empty)
@@ -19,7 +19,7 @@ fn is_non_empty<'r>(line: &'r &str) -> bool {
     !line.trim().is_empty()
 }
 
-fn process_line(res: WaveDataResult, line: &str) -> WaveDataResult {
+fn process_line(res: RawWaveDataResult, line: &str) -> RawWaveDataResult {
     res.and_then(|mut acc| {
         parse_csv_line(line).map(|line_data| {
             acc.push(line_data);
@@ -28,7 +28,7 @@ fn process_line(res: WaveDataResult, line: &str) -> WaveDataResult {
     })
 }
 
-fn parse_csv_line(line: &str) -> Result<WaveFrame, IOError> {
+fn parse_csv_line(line: &str) -> Result<RawWaveFrame, IOError> {
     split_line(line).and_then(parse_wave_data)
 }
 
@@ -44,7 +44,7 @@ fn next_line_part<'a>(line_parts: &mut Split<'a, &str>) -> Result<&'a str, IOErr
     line_parts.next().ok_or_else(|| IOError::from(InvalidInput))
 }
 
-fn parse_wave_data((a, b): (String, String)) -> Result<WaveFrame, IOError> {
+fn parse_wave_data((a, b): (String, String)) -> Result<RawWaveFrame, IOError> {
     Ok((
         a.parse().or_else(|_| Err(IOError::from(InvalidData)))?,
         b.parse().or_else(|_| Err(IOError::from(InvalidData)))?,
@@ -60,10 +60,10 @@ mod tests {
         assert_eq!(
             open_and_parse_csv("asset/test_data_valid.csv").unwrap(),
             vec!(
-                (1554451200000, 10.0),
-                (1554454800000, 25.0),
-                (1554458400000, 25.0),
-                (1554462000000, 22.0)
+                (1554451200000, 10),
+                (1554454800000, 25),
+                (1554458400000, 25),
+                (1554462000000, 22)
             )
         );
     }
