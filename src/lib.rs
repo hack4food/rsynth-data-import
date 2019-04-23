@@ -1,64 +1,44 @@
-use std::io::{
-    Error as IOError,
-    ErrorKind::{InvalidData, InvalidInput},
-};
-use std::str::Split;
+mod parser;
+mod data_types;
 
-type RawWaveFrame = (u64, u64);
-type RawWaveData = Vec<RawWaveFrame>;
-type RawWaveDataResult = Result<RawWaveData, IOError>;
+use std::path::Path;
+use data_types::*;
 
-pub fn open_and_parse_csv(csv_path: &str) -> RawWaveDataResult {
+pub fn load_csv_data(file_path: &Path) -> WaveDataResult {
+    open_and_parse_csv(file_path).map(normalise_values)
+}
+
+fn open_and_parse_csv(csv_path: &Path) -> RawWaveDataResult {
     std::fs::read_to_string(csv_path)?
         .lines()
-        .filter(is_non_empty)
-        .fold(Ok(vec![]), process_line)
+        .fold(Ok(vec![]), parser::process_line)
 }
 
-fn is_non_empty<'r>(line: &'r &str) -> bool {
-    !line.trim().is_empty()
-}
+// TODO: introduce fn normalise_timepoints (or something)
 
-fn process_line(res: RawWaveDataResult, line: &str) -> RawWaveDataResult {
-    res.and_then(|mut acc| {
-        parse_csv_line(line).map(|line_data| {
-            acc.push(line_data);
-            acc
-        })
-    })
-}
-
-fn parse_csv_line(line: &str) -> Result<RawWaveFrame, IOError> {
-    split_line(line).and_then(parse_wave_data)
-}
-
-fn split_line<'a>(line: &'a str) -> Result<(String, String), IOError> {
-    let mut line_parts = line.split(",");
-    Ok((
-        next_line_part(&mut line_parts)?.to_string(),
-        next_line_part(&mut line_parts)?.to_string(),
-    ))
-}
-
-fn next_line_part<'a>(line_parts: &mut Split<'a, &str>) -> Result<&'a str, IOError> {
-    line_parts.next().ok_or_else(|| IOError::from(InvalidInput))
-}
-
-fn parse_wave_data((a, b): (String, String)) -> Result<RawWaveFrame, IOError> {
-    Ok((
-        a.parse().or_else(|_| Err(IOError::from(InvalidData)))?,
-        b.parse().or_else(|_| Err(IOError::from(InvalidData)))?,
-    ))
+fn normalise_values(raw_data: RawWaveData) -> WaveData {
+    let (min, max) = raw_data.iter()
+        .fold((&0u64, &0u64), |(min, max), (_time, amplitude)| {
+            match amplitude {
+                amp if amp < min => (amp, max),
+                amp if amp > max => (min, amp),
+                _ => (min, max)
+            }
+        });
+    let amp_range = (max - min) as f64;
+    raw_data.iter().map(|(t, a)| (*t, (*a as f64/amp_range) - 0.5f64)).collect()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    // TODO: Write test for normalize cases
+
     #[test]
     fn verify_successful_csv_reading() {
         assert_eq!(
-            open_and_parse_csv("asset/test_data_valid.csv").unwrap(),
+            open_and_parse_csv("asset/test_data_valid.csv".as_ref()).unwrap(),
             vec!(
                 (1554451200000, 10),
                 (1554454800000, 25),
@@ -70,11 +50,11 @@ mod tests {
 
     #[test]
     fn verify_bad_line_errors() {
-        assert!(open_and_parse_csv("asset/test_data_malformed_line.csv").is_err());
+        assert!(open_and_parse_csv("asset/test_data_malformed_line.csv".as_ref()).is_err());
     }
 
     #[test]
     fn verify_bad_data_errors() {
-        assert!(open_and_parse_csv("asset/test_data_malformed_data.csv").is_err());
+        assert!(open_and_parse_csv("asset/test_data_malformed_data.csv".as_ref()).is_err());
     }
 }
