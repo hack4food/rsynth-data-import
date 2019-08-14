@@ -26,7 +26,7 @@ fn normalise_values(raw_data: RawWaveData) -> WaveData {
             }
         });
     let amp_range = (max - min) as f64;
-    raw_data.iter().map(|(t, a)| (*t, (*a as f64/amp_range) - 0.5f64)).collect()
+    raw_data.iter().map(|(t, a)| (*t, ((*a as f64 - min)/amp_range) - 0.5f64)).collect()
 }
 
 #[cfg(test)]
