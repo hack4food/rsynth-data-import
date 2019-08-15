@@ -22,11 +22,10 @@ fn open_and_parse_csv(csv_path: &Path) -> RawWaveDataResult {
         .fold(Ok(vec![]), parser::process_line)
 }
 
-// TODO: introduce fn normalise_timepoints (or something)
-
 fn normalise_values(raw_data: RawWaveData) -> WaveData {
     let time_start = raw_data.get(0).unwrap().0;
     let time_end = raw_data.get(raw_data.len() - 1).unwrap().0;
+    let time_duration = time_end - time_start;
 
     let (amp_min, amp_max) = compute_amp_range(&raw_data);
     let amp_range = (amp_max - amp_min) as f64;
@@ -34,19 +33,12 @@ fn normalise_values(raw_data: RawWaveData) -> WaveData {
     raw_data
         .iter()
         .map(|f| {
-            (
-                f.0 - time_start, // normalise time to start point
-                normalise_amplitude(f.1 as f64, amp_min as f64, amp_range),
-            )
+            let t = (f.0 - time_start) as f64 / time_duration as f64;
+            let a = ((f.1 as f64 - amp_min as f64) / amp_range) - 0.5f64;
+
+            (t, a)
         })
         .collect()
-}
-
-fn normalise_amplitude(amp: f64, amp_min: f64, amp_range: f64) -> f64 {
-    // 1) offset amp
-    // 2) normalize to [0., 1.]
-    // 3) shift value into [-0.5, 0.5]
-    ((amp - amp_min) / amp_range) - 0.5f64
 }
 
 fn compute_amp_range(raw_data: &RawWaveData) -> (u64, u64) {
@@ -69,12 +61,12 @@ fn gather_zero_crossings(wave_data: WaveData) -> WaveData {
     let _ = wave_data
         .iter()
         .zip(wave_data.iter().skip(1))
-        .filter(|((t1, a1), (t2, a2))| {
+        .filter(|((_t1, a1), (_t2, a2))| {
             *a2 as f64 == 0.
                 || ((*a1 as f64) <= 0. && 0. < *a2 as f64)
                 || ((*a1 as f64 >= 0.) && 0. > *a2 as f64)
         })
-        .map(|((t1, a1), (t2, a2))| {
+        .map(|((t1, a1), (t2, _a2))| {
             if *a1 == 0. {
                 DerivedCrossing {
                     before: *t1,
@@ -86,12 +78,11 @@ fn gather_zero_crossings(wave_data: WaveData) -> WaveData {
                     before: *t1,
                     after: *t2,
                     // TODO: find a better zero-point! (think: kx+m ;)
-                    crossing: (*t1 + *t2) / 2,
+                    crossing: (*t1 + *t2) / 2.,
                 }
             }
         })
-        .map(|x| dbg!(x))
-        .collect::<Vec<DerivedCrossing<u64>>>();
+        .collect::<Vec<DerivedCrossing<f64>>>();
 
     wave_data
 }
@@ -115,7 +106,7 @@ fn plot_values(wave_data: WaveData) -> WaveData {
         .x_label("Time")
         .y_label("Amplitude");
 
-    let plot_save = plotlib::page::Page::single(&v).save("wave.svg");
+    let _plot_save = plotlib::page::Page::single(&v).save("wave.svg");
 
     wave_data
 }
