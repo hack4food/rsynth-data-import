@@ -12,6 +12,7 @@ use plotlib::style::Line;
 pub fn load_csv_data(file_path: &Path) -> WaveDataResult {
     open_and_parse_csv(file_path)
         .map(normalise_values)
+        .map(gather_zero_crossings)
         .map(plot_values)
 }
 
@@ -55,6 +56,44 @@ fn compute_amp_range(raw_data: &RawWaveData) -> (u64, u64) {
         .fold((limit, limit), |(a_min, a_max), (_time, amp)| {
             (min(a_min, *amp), max(a_max, *amp))
         })
+}
+
+#[derive(Debug)]
+struct DerivedCrossing<T> {
+    before: T,
+    crossing: T,
+    after: T,
+}
+
+fn gather_zero_crossings(wave_data: WaveData) -> WaveData {
+    let _ = wave_data
+        .iter()
+        .zip(wave_data.iter().skip(1))
+        .filter(|((t1, a1), (t2, a2))| {
+            *a2 as f64 == 0.
+                || ((*a1 as f64) <= 0. && 0. < *a2 as f64)
+                || ((*a1 as f64 >= 0.) && 0. > *a2 as f64)
+        })
+        .map(|((t1, a1), (t2, a2))| {
+            if *a1 == 0. {
+                DerivedCrossing {
+                    before: *t1,
+                    after: *t1,
+                    crossing: *t1,
+                }
+            } else {
+                DerivedCrossing {
+                    before: *t1,
+                    after: *t2,
+                    // TODO: find a better zero-point! (think: kx+m ;)
+                    crossing: (*t1 + *t2) / 2,
+                }
+            }
+        })
+        .map(|x| dbg!(x))
+        .collect::<Vec<DerivedCrossing<u64>>>();
+
+    wave_data
 }
 
 fn plot_values(wave_data: WaveData) -> WaveData {
