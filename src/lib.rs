@@ -24,40 +24,43 @@ fn open_and_parse_csv(csv_path: &Path) -> RawWaveDataResult {
 // TODO: introduce fn normalise_timepoints (or something)
 
 fn normalise_values(raw_data: RawWaveData) -> WaveData {
-    let (amp_min, amp_max) = compute_amp_range(&raw_data);
     let time_start = raw_data.get(0).unwrap().0;
     let time_end = raw_data.get(raw_data.len() - 1).unwrap().0;
+
+    let (amp_min, amp_max) = compute_amp_range(&raw_data);
     let amp_range = (amp_max - amp_min) as f64;
 
     raw_data
         .iter()
-        .map(|frame| normalise_frame(frame, time_start, *amp_min as f64, amp_range))
+        .map(|f| {
+            (
+                f.0 - time_start, // normalise time to start point
+                normalise_amplitude(f.1 as f64, amp_min as f64, amp_range),
+            )
+        })
         .collect()
 }
 
-fn compute_amp_range(raw_data: &RawWaveData) -> (&u64, &u64) {
-    raw_data
-        .iter()
-        .fold((&0u64, &0u64), |(a_min, a_max), (_time, amp)| {
-            (min(a_min, amp), max(a_max, amp))
-        })
+fn normalise_amplitude(amp: f64, amp_min: f64, amp_range: f64) -> f64 {
+    // 1) offset amp
+    // 2) normalize to [0., 1.]
+    // 3) shift value into [-0.5, 0.5]
+    ((amp - amp_min) / amp_range) - 0.5f64
 }
 
-fn normalise_frame(
-    raw_frame: &RawWaveFrame,
-    time_start: u64,
-    amp_min: f64,
-    amp_range: f64,
-) -> WaveFrame {
-    (
-        raw_frame.0 - time_start,
-        ((raw_frame.1 as f64 - amp_min) / amp_range) - 0.5f64,
-    )
+fn compute_amp_range(raw_data: &RawWaveData) -> (u64, u64) {
+    let limit = raw_data.get(0).unwrap().1;
+    raw_data
+        .iter()
+        .fold((limit, limit), |(a_min, a_max), (_time, amp)| {
+            (min(a_min, *amp), max(a_max, *amp))
+        })
 }
 
 fn plot_values(wave_data: WaveData) -> WaveData {
     let mut hand_line_style = plotlib::line::Style::new();
     hand_line_style.colour("#ff0000");
+    hand_line_style.width(1.);
 
     let plot_points: Vec<(f64, f64)> = wave_data.iter().map(|(t, a)| (*t as f64, *a)).collect();
     let points_line = plotlib::line::Line::new(plot_points.as_slice()).style(&hand_line_style);
@@ -68,6 +71,7 @@ fn plot_values(wave_data: WaveData) -> WaveData {
     let v = plotlib::view::ContinuousView::new()
         .add(&points_line)
         .x_range(x_min, x_max)
+        // NOTE: should this be dynamic? probably not ... but maybe?
         .y_range(-0.5, 0.5)
         .x_label("Time")
         .y_label("Amplitude");
