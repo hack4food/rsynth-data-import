@@ -1,9 +1,9 @@
 extern crate plotlib;
 
-mod data_types;
+pub mod data_types;
 mod parser;
 
-use data_types::*;
+pub use data_types::*;
 use std::cmp::{max, min};
 use std::path::Path;
 
@@ -34,7 +34,7 @@ fn normalise_values(raw_data: RawWaveData) -> WaveData {
         .iter()
         .map(|f| {
             let t = (f.0 - time_start) as f64 / time_duration as f64;
-            let a = ((f.1 as f64 - amp_min as f64) / amp_range) - 0.5f64;
+            let a = ((f.1 as f64 - amp_min as f64) * 2. / amp_range) - 1.;
 
             (t, a)
         })
